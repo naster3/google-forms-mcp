@@ -27,6 +27,7 @@ import {
   addParagraphQuestionInputSchema,
   addSectionInputSchema,
   addTextQuestionInputSchema,
+  createFormInputSchema,
   deleteItemInputSchema,
   getFormInputSchema,
   getResponseInputSchema,
@@ -97,12 +98,62 @@ function toChoiceOptionInputs(
 }
 
 export function registerTools(server: McpServer, context: AppContext): void {
+  const readOnlyAnnotations = { readOnlyHint: true, openWorldHint: true };
+  const writeAnnotations = { readOnlyHint: false, openWorldHint: true };
+  const destructiveAnnotations = {
+    readOnlyHint: false,
+    destructiveHint: true,
+    openWorldHint: true,
+  };
+
+  server.tool(
+    "create_form",
+    "Create a new empty Google Form. Optionally set the Drive document title and form description during setup.",
+    createFormInputSchema.shape,
+    writeAnnotations,
+    async (input) =>
+      executeTool(input, createFormInputSchema, async ({ title, documentTitle, description }) => {
+        const createdForm = await context.formsClient.createForm({
+          title,
+          ...(documentTitle !== undefined ? { documentTitle } : {}),
+        });
+
+        const createdFormId = createdForm.formId;
+
+        if (!createdFormId) {
+          throw new AppError(
+            "google_api_error",
+            "Google Forms API did not return a formId for the created form.",
+          );
+        }
+
+        const finalForm =
+          description !== undefined
+            ? (
+                await context.formsClient.batchUpdate(
+                  createdFormId,
+                  buildUpdateFormInfoRequests(undefined, description),
+                )
+              ).form ?? (await context.formsClient.getForm(createdFormId))
+            : createdForm;
+
+        return {
+          formId: finalForm.formId ?? createdFormId,
+          info: finalForm.info ?? null,
+          responderUri: finalForm.responderUri ?? null,
+          revisionId: finalForm.revisionId ?? null,
+          publishSettings: finalForm.publishSettings ?? null,
+          itemCount: finalForm.items?.length ?? 0,
+          items: normalizeFormItems(finalForm),
+        };
+      }),
+  );
+
   server.tool(
     "get_form",
-    "Get a Google Form by formId.",
-    {
-      formId: z.string().min(1),
-    },
+    "Fetch form metadata, publish settings, responder URL, and normalized items for a Google Form.",
+    getFormInputSchema.shape,
+    readOnlyAnnotations,
     async (input) =>
       executeTool(input, getFormInputSchema, async ({ formId }) => {
         const form = await context.formsClient.getForm(formId);
@@ -120,15 +171,16 @@ export function registerTools(server: McpServer, context: AppContext): void {
       }),
   );
 
-  server.tool(
+  server.registerTool(
     "update_form_info",
-    "Update the title and/or description of a Google Form using forms.batchUpdate.",
     {
-      formId: z.string().min(1),
-      title: z.string().min(1).optional(),
-      description: z.string().min(1).optional(),
+      title: "Update Form Info",
+      description:
+        "Update the form title and/or description. Use this when changing top-level form metadata, not individual questions.",
+      inputSchema: updateFormInfoInputSchema,
+      annotations: writeAnnotations,
     },
-    async (input) =>
+    async (input: unknown) =>
       executeTool(input, updateFormInfoInputSchema, async ({ formId, title, description }) => {
         const response = await context.formsClient.batchUpdate(
           formId,
@@ -149,10 +201,9 @@ export function registerTools(server: McpServer, context: AppContext): void {
 
   server.tool(
     "list_items",
-    "List normalized Google Form items.",
-    {
-      formId: z.string().min(1),
-    },
+    "List all form items in a normalized, agent-friendly structure with indexes, itemIds, question types, and options.",
+    listItemsInputSchema.shape,
+    readOnlyAnnotations,
     async (input) =>
       executeTool(input, listItemsInputSchema, async ({ formId }) => {
         const form = await context.formsClient.getForm(formId);
@@ -167,17 +218,9 @@ export function registerTools(server: McpServer, context: AppContext): void {
 
   server.tool(
     "add_image_item",
-    "Add an image block to a Google Form using forms.batchUpdate.",
-    {
-      formId: z.string().min(1),
-      title: z.string().min(1).optional(),
-      description: z.string().min(1).optional(),
-      imageUrl: z.string().url(),
-      altText: z.string().min(1).optional(),
-      width: z.number().int().min(1).max(740).optional(),
-      alignment: z.enum(["LEFT", "CENTER", "RIGHT"]).optional(),
-      index: z.number().int().min(0).optional(),
-    },
+    "Insert a standalone image block into the form. Use this for banners, separators, references, or visual examples between questions.",
+    addImageItemInputSchema.shape,
+    writeAnnotations,
     async (input) =>
       executeTool(
         input,
@@ -211,14 +254,9 @@ export function registerTools(server: McpServer, context: AppContext): void {
 
   server.tool(
     "add_text_question",
-    "Add a short text question to a Google Form using forms.batchUpdate.",
-    {
-      formId: z.string().min(1),
-      title: z.string().min(1),
-      description: z.string().min(1).optional(),
-      required: z.boolean(),
-      index: z.number().int().min(0).optional(),
-    },
+    "Add a short-answer text question to the form.",
+    addTextQuestionInputSchema.shape,
+    writeAnnotations,
     async (input) =>
       executeTool(
         input,
@@ -242,14 +280,9 @@ export function registerTools(server: McpServer, context: AppContext): void {
 
   server.tool(
     "add_paragraph_question",
-    "Add a paragraph question to a Google Form using forms.batchUpdate.",
-    {
-      formId: z.string().min(1),
-      title: z.string().min(1),
-      description: z.string().min(1).optional(),
-      required: z.boolean(),
-      index: z.number().int().min(0).optional(),
-    },
+    "Add a long-answer paragraph question to the form.",
+    addParagraphQuestionInputSchema.shape,
+    writeAnnotations,
     async (input) =>
       executeTool(
         input,
@@ -273,16 +306,9 @@ export function registerTools(server: McpServer, context: AppContext): void {
 
   server.tool(
     "add_multiple_choice_question",
-    "Add a multiple-choice question to a Google Form using forms.batchUpdate.",
-    {
-      formId: z.string().min(1),
-      title: z.string().min(1),
-      description: z.string().min(1).optional(),
-      options: z.array(z.string().min(1)).min(1),
-      includeOther: z.boolean().optional(),
-      required: z.boolean(),
-      index: z.number().int().min(0).optional(),
-    },
+    "Add a single-select multiple-choice question. Supports optional native 'Other' choice.",
+    addMultipleChoiceQuestionInputSchema.shape,
+    writeAnnotations,
     async (input) =>
       executeTool(
         input,
@@ -313,16 +339,9 @@ export function registerTools(server: McpServer, context: AppContext): void {
 
   server.tool(
     "add_checkbox_question",
-    "Add a checkbox question to a Google Form using forms.batchUpdate.",
-    {
-      formId: z.string().min(1),
-      title: z.string().min(1),
-      description: z.string().min(1).optional(),
-      options: z.array(z.string().min(1)).min(1),
-      includeOther: z.boolean().optional(),
-      required: z.boolean(),
-      index: z.number().int().min(0).optional(),
-    },
+    "Add a multi-select checkbox question. Supports optional native 'Other' choice.",
+    addCheckboxQuestionInputSchema.shape,
+    writeAnnotations,
     async (input) =>
       executeTool(
         input,
@@ -353,15 +372,9 @@ export function registerTools(server: McpServer, context: AppContext): void {
 
   server.tool(
     "add_dropdown_question",
-    "Add a dropdown question to a Google Form using forms.batchUpdate.",
-    {
-      formId: z.string().min(1),
-      title: z.string().min(1),
-      description: z.string().min(1).optional(),
-      options: z.array(z.string().min(1)).min(1),
-      required: z.boolean(),
-      index: z.number().int().min(0).optional(),
-    },
+    "Add a dropdown question for compact single-select choices.",
+    addDropdownQuestionInputSchema.shape,
+    writeAnnotations,
     async (input) =>
       executeTool(
         input,
@@ -392,13 +405,9 @@ export function registerTools(server: McpServer, context: AppContext): void {
 
   server.tool(
     "add_section",
-    "Add a section header (page break) to a Google Form using forms.batchUpdate.",
-    {
-      formId: z.string().min(1),
-      title: z.string().min(1),
-      description: z.string().min(1).optional(),
-      index: z.number().int().min(0).optional(),
-    },
+    "Add a new section header (page break) to split the form into multiple sections.",
+    addSectionInputSchema.shape,
+    writeAnnotations,
     async (input) =>
       executeTool(input, addSectionInputSchema, async ({ formId, title, description, index }) => {
         const form = await context.formsClient.getForm(formId);
@@ -416,17 +425,15 @@ export function registerTools(server: McpServer, context: AppContext): void {
       }),
   );
 
-  server.tool(
+  server.registerTool(
     "update_section",
-    "Update a Google Form section header by itemId or currentIndex using forms.batchUpdate.",
     {
-      formId: z.string().min(1),
-      itemId: z.string().min(1).optional(),
-      currentIndex: z.number().int().min(0).optional(),
-      title: z.string().min(1).optional(),
-      description: z.string().min(1).optional(),
+      title: "Update Section",
+      description: "Update an existing section header by itemId or item index.",
+      inputSchema: updateSectionInputSchema,
+      annotations: writeAnnotations,
     },
-    async (input) =>
+    async (input: unknown) =>
       executeTool(
         input,
         updateSectionInputSchema,
@@ -453,21 +460,15 @@ export function registerTools(server: McpServer, context: AppContext): void {
       ),
   );
 
-  server.tool(
+  server.registerTool(
     "update_image_item",
-    "Update an image block in a Google Form by itemId or currentIndex using forms.batchUpdate.",
     {
-      formId: z.string().min(1),
-      itemId: z.string().min(1).optional(),
-      currentIndex: z.number().int().min(0).optional(),
-      title: z.string().min(1).optional(),
-      description: z.string().min(1).optional(),
-      imageUrl: z.string().url().optional(),
-      altText: z.string().min(1).optional(),
-      width: z.number().int().min(1).max(740).optional(),
-      alignment: z.enum(["LEFT", "CENTER", "RIGHT"]).optional(),
+      title: "Update Image Item",
+      description: "Update a standalone image block by itemId or item index.",
+      inputSchema: updateImageItemInputSchema,
+      annotations: writeAnnotations,
     },
-    async (input) =>
+    async (input: unknown) =>
       executeTool(
         input,
         updateImageItemInputSchema,
@@ -514,19 +515,15 @@ export function registerTools(server: McpServer, context: AppContext): void {
       ),
   );
 
-  server.tool(
+  server.registerTool(
     "set_question_image",
-    "Attach an image to an existing Google Form question by itemId or currentIndex using forms.batchUpdate.",
     {
-      formId: z.string().min(1),
-      itemId: z.string().min(1).optional(),
-      currentIndex: z.number().int().min(0).optional(),
-      imageUrl: z.string().url(),
-      altText: z.string().min(1).optional(),
-      width: z.number().int().min(1).max(740).optional(),
-      alignment: z.enum(["LEFT", "CENTER", "RIGHT"]).optional(),
+      title: "Set Question Image",
+      description: "Attach or replace the image shown above an existing question.",
+      inputSchema: setQuestionImageInputSchema,
+      annotations: writeAnnotations,
     },
-    async (input) =>
+    async (input: unknown) =>
       executeTool(
         input,
         setQuestionImageInputSchema,
@@ -554,31 +551,16 @@ export function registerTools(server: McpServer, context: AppContext): void {
       ),
   );
 
-  server.tool(
+  server.registerTool(
     "update_question",
-    "Update an existing Google Form question by itemId or currentIndex using forms.batchUpdate.",
     {
-      formId: z.string().min(1),
-      itemId: z.string().min(1).optional(),
-      currentIndex: z.number().int().min(0).optional(),
-      title: z.string().min(1).optional(),
-      description: z.string().min(1).optional(),
-      required: z.boolean().optional(),
-      options: z.array(z.string().min(1)).min(1).optional(),
-      choiceType: z.enum(["RADIO", "CHECKBOX", "DROP_DOWN"]).optional(),
-      paragraph: z.boolean().optional(),
-      includeOther: z.boolean().optional(),
-      optionNavigation: z
-        .array(
-          z.object({
-            optionValue: z.string().min(1),
-            goToSectionId: z.string().min(1).optional(),
-            goToAction: z.enum(["NEXT_SECTION", "RESTART_FORM", "SUBMIT_FORM"]).optional(),
-          }),
-        )
-        .optional(),
+      title: "Update Question",
+      description:
+        "Update an existing question by itemId or item index. Supports title, description, required, options, question type, long-answer mode, and section navigation for single-select options.",
+      inputSchema: updateQuestionInputSchema,
+      annotations: writeAnnotations,
     },
-    async (input) =>
+    async (input: unknown) =>
       executeTool(
         input,
         updateQuestionInputSchema,
@@ -632,16 +614,15 @@ export function registerTools(server: McpServer, context: AppContext): void {
       ),
   );
 
-  server.tool(
+  server.registerTool(
     "move_item",
-    "Move a Google Form item by itemId or currentIndex using forms.batchUpdate.",
     {
-      formId: z.string().min(1),
-      itemId: z.string().min(1).optional(),
-      currentIndex: z.number().int().min(0).optional(),
-      newIndex: z.number().int().min(0),
+      title: "Move Item",
+      description: "Move any form item to a new zero-based index.",
+      inputSchema: moveItemInputSchema,
+      annotations: writeAnnotations,
     },
-    async (input) =>
+    async (input: unknown) =>
       executeTool(input, moveItemInputSchema, async ({ formId, itemId, currentIndex, newIndex }) => {
         const form = await context.formsClient.getForm(formId);
         if (itemId === undefined && currentIndex === undefined) {
@@ -679,15 +660,16 @@ export function registerTools(server: McpServer, context: AppContext): void {
       }),
   );
 
-  server.tool(
+  server.registerTool(
     "delete_item",
-    "Delete a Google Form item by itemId or currentIndex using forms.batchUpdate.",
     {
-      formId: z.string().min(1),
-      itemId: z.string().min(1).optional(),
-      currentIndex: z.number().int().min(0).optional(),
+      title: "Delete Item",
+      description:
+        "Delete a form item by itemId or item index. This permanently removes the item from the form.",
+      inputSchema: deleteItemInputSchema,
+      annotations: destructiveAnnotations,
     },
-    async (input) =>
+    async (input: unknown) =>
       executeTool(input, deleteItemInputSchema, async ({ formId, itemId, currentIndex }) => {
         const form = await context.formsClient.getForm(formId);
         if (itemId === undefined && currentIndex === undefined) {
@@ -716,12 +698,9 @@ export function registerTools(server: McpServer, context: AppContext): void {
 
   server.tool(
     "list_responses",
-    "List Google Form responses with pagination support.",
-    {
-      formId: z.string().min(1),
-      pageSize: z.number().int().min(1).max(5000).optional(),
-      pageToken: z.string().min(1).optional(),
-    },
+    "List form responses with pagination support.",
+    listResponsesInputSchema.shape,
+    readOnlyAnnotations,
     async (input) =>
       executeTool(input, listResponsesInputSchema, async ({ formId, pageSize, pageToken }) => {
         const response = await context.formsClient.listResponses(formId, pageSize, pageToken);
@@ -737,11 +716,9 @@ export function registerTools(server: McpServer, context: AppContext): void {
 
   server.tool(
     "get_response",
-    "Get a single Google Form response by responseId.",
-    {
-      formId: z.string().min(1),
-      responseId: z.string().min(1),
-    },
+    "Fetch one form response by responseId.",
+    getResponseInputSchema.shape,
+    readOnlyAnnotations,
     async (input) =>
       executeTool(input, getResponseInputSchema, async ({ formId, responseId }) => {
         const response = await context.formsClient.getResponse(formId, responseId);
@@ -756,12 +733,9 @@ export function registerTools(server: McpServer, context: AppContext): void {
 
   server.tool(
     "set_publish_settings",
-    "Publish or unpublish a Google Form. Optional responderAccess uses Drive permissions and requires Drive scope.",
-    {
-      formId: z.string().min(1),
-      published: z.boolean(),
-      responderAccess: z.enum(["ANYONE_WITH_LINK", "RESTRICTED"]).optional(),
-    },
+    "Publish or unpublish a form. Optionally apply responder access using Google Drive permissions when Drive scope is enabled.",
+    setPublishSettingsInputSchema.shape,
+    writeAnnotations,
     async (input) =>
       executeTool(
         input,

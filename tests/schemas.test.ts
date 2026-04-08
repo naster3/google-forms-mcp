@@ -6,6 +6,7 @@ import {
   addParagraphQuestionInputSchema,
   addSectionInputSchema,
   addCheckboxQuestionInputSchema,
+  createFormInputSchema,
   deleteItemInputSchema,
   moveItemInputSchema,
   setPublishSettingsInputSchema,
@@ -17,6 +18,16 @@ import {
 } from "../src/tools/schemas.js";
 
 describe("tool schemas", () => {
+  it("accepts create_form schema", () => {
+    const result = createFormInputSchema.safeParse({
+      title: "Client intake form",
+      documentTitle: "Client Intake",
+      description: "Initial intake questionnaire",
+    });
+
+    assert.equal(result.success, true);
+  });
+
   it("rejects update_form_info without changes", () => {
     const result = updateFormInfoInputSchema.safeParse({ formId: "abc123" });
     assert.equal(result.success, false);

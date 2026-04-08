@@ -1,15 +1,29 @@
 {
-  "name": "mcp-server-googleform",
+  "name": "google-forms-mcp",
   "version": "1.0.0",
-  "description": "Professional MCP server for Google Forms using official Google APIs.",
+  "description": "MCP server for reading and editing Google Forms with the official Google Forms and Google Drive APIs.",
   "packageManager": "pnpm@10.17.1",
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "google-forms-mcp": "./bin/google-forms-mcp.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "README.md",
+    "LICENSE",
+    ".env.example"
+  ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "ui": "tsx src/ui/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "prepack": "pnpm run build",
     "test": "node scripts/test-package.mjs",
     "auth": "node scripts/auth-package.mjs",
     "professionalize:web-form": "node scripts/professionalize-web-form-package.mjs",
@@ -17,10 +31,14 @@
   },
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "google-forms",
     "google-drive",
     "typescript",
-    "codex"
+    "codex",
+    "claude",
+    "cline",
+    "developer-tools"
   ],
   "license": "MIT",
   "engines": {

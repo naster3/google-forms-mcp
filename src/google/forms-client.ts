@@ -18,6 +18,26 @@ export class GoogleFormsClient {
     });
   }
 
+  public async createForm(params: {
+    title: string;
+    documentTitle?: string;
+  }): Promise<GoogleForm> {
+    const { title, documentTitle } = params;
+
+    return withGoogleRetry(async () => {
+      const response = await this.client.forms.create({
+        requestBody: {
+          info: {
+            title,
+            ...(documentTitle !== undefined ? { documentTitle } : {}),
+          },
+        },
+      });
+
+      return response.data;
+    });
+  }
+
   public async batchUpdate(
     formId: string,
     requests: GoogleBatchRequest[],

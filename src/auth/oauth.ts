@@ -21,7 +21,7 @@ export async function loadAuthorizedClient(env: AppEnv, logger: Logger): Promise
 
   if (!storedCredentials) {
     throw new Error(
-      `OAuth token file not found at ${tokenStore.absolutePath}. Run "npm run auth" first.`,
+      `OAuth token file not found at ${tokenStore.absolutePath}. Run "pnpm run auth" first.`,
     );
   }
 

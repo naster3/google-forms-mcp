@@ -1,52 +1,106 @@
-# Google Forms MCP Server
+# Google Forms MCP
 
-An MCP server for Google Forms built with Node.js and TypeScript, using the official Google APIs.
+MCP server for reading, editing, and publishing Google Forms with the official Google Forms API.
 
-It is designed for local use with Codex or any MCP client that can connect over `stdio`.
+This project is for developers and agent builders who want to automate real Google Forms work instead of scraping pages or manually clicking through the UI.
 
-## What It Does
+## Why This Exists
 
-- Reads Google Forms metadata and items
-- Updates form title and description
-- Adds, updates, moves, and deletes questions
-- Lists responses
-- Optionally updates publish settings
-- Optionally uses Google Drive permissions when responder access changes require it
+Most MCP servers that touch productivity software stop at read-only access or expose vague tool behavior.
 
-## Tech Stack
+This one is focused on a narrower, more useful job:
 
-- Node.js 20+
-- TypeScript
-- `@modelcontextprotocol/sdk`
-- Google Forms API v1
-- Google Drive API v3
-- Zod for input validation
+- inspect a real Google Form
+- update structure and copy safely
+- add and edit questions
+- move and delete items
+- attach images
+- list responses
+- publish or unpublish the form
 
-## Project Layout
+That makes it useful for:
+
+- AI agents that maintain intake forms
+- agencies that generate or refine client questionnaires
+- internal tools teams building workflow automations around Google Forms
+- developers who need repeatable form changes in code
+
+## What Problem It Solves
+
+Google Forms is widely used, but it is painful to automate reliably.
+
+Typical pain points:
+
+- agents do not know the form structure before editing
+- manual edits are slow and error-prone
+- publishing state and responder access are easy to mishandle
+- response retrieval is inconsistent across ad hoc scripts
+
+This MCP gives agents a structured, typed surface to work with.
+
+## Product Positioning
+
+This is not a generic “Google workspace MCP”.
+
+It is best positioned as:
+
+> The MCP for programmatic Google Forms operations: read, edit, restructure, and publish forms safely with official APIs.
+
+That is much more sellable than “professional Google Forms server”.
+
+## First Successful Use in Under 2 Minutes
+
+The fastest path to value is:
+
+1. Connect the server with working Google OAuth credentials.
+2. Run `create_form` or `get_form`.
+3. Run `list_items`.
+4. Change one obvious thing with `update_form_info` or `add_text_question`.
+
+Recommended first prompt:
 
 ```text
-src/
-  auth/
-  google/
-  mcp/
-  tools/
-  types/
-  ui/
-  utils/
-scripts/
-tests/
+Create a Google Form called "Client Intake Form", add a short description for respondents, then add a required short-answer question titled "Project owner name".
 ```
 
-## Requirements
+If that works, users immediately understand the value.
+
+## Core Capabilities
+
+- `create_form`
+- `get_form`
+- `list_items`
+- `update_form_info`
+- `add_text_question`
+- `add_paragraph_question`
+- `add_multiple_choice_question`
+- `add_checkbox_question`
+- `add_dropdown_question`
+- `add_section`
+- `update_section`
+- `add_image_item`
+- `update_image_item`
+- `set_question_image`
+- `update_question`
+- `move_item`
+- `delete_item`
+- `list_responses`
+- `get_response`
+- `set_publish_settings`
+
+The tools return structured JSON with normalized item data so agents can reason about the form before mutating it.
+
+## Installation
+
+### Option 1: Run From Source
+
+Requirements:
 
 - Node.js `>=20.11.0`
-- `pnpm` `10.x`
-- A Google account with access to Google Forms
-- A Google Cloud project with OAuth credentials
-- Google Forms API enabled
-- Google Drive API enabled only if you need responder-access changes through Drive permissions
+- `pnpm`
+- Google Cloud OAuth credentials
 
-## Quick Start
+Install:
 
 ```powershell
 pnpm install
@@ -64,94 +118,41 @@ GOOGLE_INCLUDE_DRIVE_SCOPE=false
 GOOGLE_LOG_LEVEL=info
 ```
 
-Then authorize locally:
+Authorize once:
 
 ```powershell
 pnpm run auth
 ```
 
-Build and start:
+Build:
 
 ```powershell
 pnpm run build
-pnpm run start
 ```
 
-For development:
+### Option 2: Package Distribution
+
+The package is prepared to be published as `google-forms-mcp`.
+
+Once published to npm, the intended command surface is:
 
 ```powershell
-pnpm run dev
+npx google-forms-mcp
 ```
 
-## Google Cloud Setup
+If you want real adoption, publish the package. Requiring source checkout is a growth bottleneck.
 
-1. Create or select a Google Cloud project.
-2. Enable Google Forms API.
-3. Enable Google Drive API only if you need responder-access updates.
-4. Configure the OAuth consent screen.
-5. Create an OAuth client.
-6. Add `http://127.0.0.1:3005/oauth2callback` as an authorized redirect URI if you use a web client.
-7. Copy the client ID and client secret into `.env`.
+## MCP Client Configuration
 
-## Environment Variables
-
-| Variable | Required | Description |
-| --- | --- | --- |
-| `GOOGLE_CLIENT_ID` | Yes | OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Yes | OAuth client secret |
-| `GOOGLE_REDIRECT_URI` | Yes | Local OAuth callback URI |
-| `GOOGLE_TOKEN_PATH` | Yes | Local token file path |
-| `GOOGLE_INCLUDE_DRIVE_SCOPE` | No | Set to `true` if Drive permissions are needed |
-| `GOOGLE_LOG_LEVEL` | No | Logging level, default `info` |
-| `UI_PORT` | No | Port for the optional local UI |
-| `TARGET_FORM_ID` | Only for utility scripts | Required by the project-specific scripts in `scripts/` |
-
-## Scripts
-
-| Command | Description |
-| --- | --- |
-| `pnpm run dev` | Start the MCP server in watch mode |
-| `pnpm run build` | Compile TypeScript to `dist/` |
-| `pnpm run start` | Run the compiled MCP server |
-| `pnpm run test` | Run the local test suite |
-| `pnpm run auth` | Run the local OAuth bootstrap flow |
-| `pnpm run ui` | Start the optional local inspection UI |
-| `pnpm run professionalize:web-form` | Run a project-specific form transformation script |
-| `pnpm run apply:design-images` | Run a project-specific image placement script |
-
-## Optional Local UI
-
-Start the UI:
-
-```powershell
-pnpm run ui
-```
-
-Then open:
-
-```text
-http://127.0.0.1:3210
-```
-
-The UI can:
-
-- Load a form by `formId`
-- Show metadata, publish state, and responder URL
-- Show normalized items and recent responses
-- Edit common question and form fields
-- Add, move, and delete questions
-
-## MCP Client Example
-
-Example configuration for a local MCP client:
+### Codex
 
 ```json
 {
   "mcpServers": {
     "google-forms": {
       "command": "node",
-      "args": ["<repo-path>/dist/index.js"],
-      "cwd": "<repo-path>",
+      "args": ["C:/path/to/google-forms-mcp/dist/index.js"],
+      "cwd": "C:/path/to/google-forms-mcp",
       "env": {
         "GOOGLE_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
         "GOOGLE_CLIENT_SECRET": "your-client-secret",
@@ -165,48 +166,91 @@ Example configuration for a local MCP client:
 }
 ```
 
-## Public Repository Notes
+### Generic stdio MCP Client
 
-This repository is safe to publish only if you keep local secrets and local artifacts out of version control.
+```json
+{
+  "command": "node",
+  "args": ["/absolute/path/to/dist/index.js"],
+  "cwd": "/absolute/path/to/repo",
+  "env": {
+    "GOOGLE_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
+    "GOOGLE_CLIENT_SECRET": "your-client-secret",
+    "GOOGLE_REDIRECT_URI": "http://127.0.0.1:3005/oauth2callback",
+    "GOOGLE_TOKEN_PATH": ".tokens/google-oauth.json",
+    "GOOGLE_INCLUDE_DRIVE_SCOPE": "false",
+    "GOOGLE_LOG_LEVEL": "info"
+  }
+}
+```
 
-Do not commit:
+## Google Cloud Setup
+
+1. Create or select a Google Cloud project.
+2. Enable Google Forms API.
+3. Enable Google Drive API only if you need responder access updates.
+4. Configure the OAuth consent screen.
+5. Create an OAuth client.
+6. Add `http://127.0.0.1:3005/oauth2callback` as an authorized redirect URI if using a web OAuth client.
+7. Put the client ID and secret into `.env`.
+
+## Tool Design Notes
+
+This MCP is strongest when the agent works in this order:
+
+1. `get_form` or `list_items`
+2. inspect indexes, itemIds, and current shape
+3. mutate with a targeted tool
+4. re-read the form if more edits are needed
+
+This order matters because Google Forms edits are structure-sensitive.
+
+## Recommended Prompts
+
+See [docs/PROMPTS.md](./docs/PROMPTS.md).
+
+## Troubleshooting
+
+See [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md).
+
+## Launch and Quality Checklists
+
+- [docs/LAUNCH_CHECKLIST.md](./docs/LAUNCH_CHECKLIST.md)
+- [docs/QUALITY_CHECKLIST.md](./docs/QUALITY_CHECKLIST.md)
+- [docs/CONTENT_PLAN.md](./docs/CONTENT_PLAN.md)
+
+## Scripts
+
+- `pnpm run dev`
+- `pnpm run build`
+- `pnpm run start`
+- `pnpm run test`
+- `pnpm run auth`
+- `pnpm run ui`
+- `pnpm run professionalize:web-form`
+- `pnpm run apply:design-images`
+
+The two project-specific scripts are not the product. They are utility scripts layered on top of the product.
+
+## Current Limitations
+
+- local `stdio` transport is the primary supported mode
+- no remote hosted version yet
+- no per-user responder sharing flow
+- Google OAuth setup is still the main installation hurdle
+
+## Security
+
+Never commit:
 
 - `.env`
 - `.tokens/`
 - `client_secret*.json`
-- local generated assets
-- form-specific private data
 
-The repository already ignores common local files, but you should still review the working tree before the first public push.
+If any credential was ever exposed, rotate it before making the repository public.
 
-## Project-Specific Utility Scripts
-
-Two scripts under `scripts/` are intentionally treated as utility scripts, not core server behavior:
-
-- `scripts/professionalize-web-form.ts`
-- `scripts/apply-design-images.ts`
-
-They now require `TARGET_FORM_ID` from the environment instead of embedding a real form ID in source code.
-
-These scripts still assume a specific content model and local image assets, so review them before presenting them as reusable public examples.
-
-## Testing
-
-```powershell
-pnpm run test
-```
-
-## Limitations
-
-- The server focuses on local `stdio` transport
-- It does not create brand-new forms as part of the core toolset
-- It does not manage individual responder email permissions
-- Drive permissions are only used where the Forms API does not cover the required behavior
-
-## Preparing This Repo for a Public Release
-
-See `docs/PUBLIC_RELEASE_CHECKLIST.md`.
+See [SECURITY.md](./SECURITY.md).
 
 ## License
 
-MIT. See `LICENSE`.
+MIT. See [LICENSE](./LICENSE).
