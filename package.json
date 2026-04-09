@@ -1,5 +1,5 @@
 {
-  "name": "@naster3/google-forms-mcp",
+  "name": "@naster/google-forms-mcp",
   "version": "1.0.0",
   "description": "MCP server for reading and editing Google Forms with the official Google Forms and Google Drive APIs.",
   "packageManager": "pnpm@10.17.1",

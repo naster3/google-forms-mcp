@@ -132,12 +132,12 @@ pnpm run build
 
 ### Option 2: Package Distribution
 
-The package is prepared to be published as `@naster3/google-forms-mcp`.
+The package is prepared to be published as `@naster/google-forms-mcp`.
 
 Once published to npm, the intended command surface is:
 
 ```powershell
-npx @naster3/google-forms-mcp
+npx @naster/google-forms-mcp
 ```
 
 If you want real adoption, publish the package. Requiring source checkout is a growth bottleneck.
