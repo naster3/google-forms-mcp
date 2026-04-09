@@ -132,15 +132,28 @@ pnpm run build
 
 ### Option 2: Package Distribution
 
-The package is prepared to be published as `@naster/google-forms-mcp`.
+The package is prepared to be published as `google-forms-mcp-naster`.
 
 Once published to npm, the intended command surface is:
 
 ```powershell
-npx @naster/google-forms-mcp
+npx google-forms-mcp-naster
 ```
 
 If you want real adoption, publish the package. Requiring source checkout is a growth bottleneck.
+
+### Option 3: Trusted Publishing from GitHub Actions
+
+This repository includes a GitHub Actions workflow for npm Trusted Publishing.
+
+Setup steps:
+
+1. In npm, open the package or account publishing settings.
+2. Add this GitHub repository as a trusted publisher.
+3. Use the workflow in `.github/workflows/publish.yml`.
+4. Publish from GitHub Actions instead of local CLI tokens.
+
+See [docs/NPM_TRUSTED_PUBLISHING.md](./docs/NPM_TRUSTED_PUBLISHING.md).
 
 ## MCP Client Configuration
 
