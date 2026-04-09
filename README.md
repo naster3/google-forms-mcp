@@ -132,12 +132,12 @@ pnpm run build
 
 ### Option 2: Package Distribution
 
-The package is prepared to be published as `google-forms-mcp`.
+The package is prepared to be published as `@naster3/google-forms-mcp`.
 
 Once published to npm, the intended command surface is:
 
 ```powershell
-npx google-forms-mcp
+npx @naster3/google-forms-mcp
 ```
 
 If you want real adoption, publish the package. Requiring source checkout is a growth bottleneck.
@@ -151,7 +151,7 @@ If you want real adoption, publish the package. Requiring source checkout is a g
   "mcpServers": {
     "google-forms": {
       "command": "node",
-      "args": ["C:/path/to/google-forms-mcp/dist/index.js"],
+      "args": ["C:/path/to/google-forms-mcp/dist/src/index.js"],
       "cwd": "C:/path/to/google-forms-mcp",
       "env": {
         "GOOGLE_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
@@ -171,7 +171,7 @@ If you want real adoption, publish the package. Requiring source checkout is a g
 ```json
 {
   "command": "node",
-  "args": ["/absolute/path/to/dist/index.js"],
+  "args": ["/absolute/path/to/dist/src/index.js"],
   "cwd": "/absolute/path/to/repo",
   "env": {
     "GOOGLE_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
